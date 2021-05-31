@@ -1,4 +1,4 @@
-package com.github.monun.sample.plugin
+package com.github.dytroInc.sample.plugin
 
 import org.bukkit.plugin.java.JavaPlugin
 
