@@ -5,7 +5,7 @@ version=1.16.5
 plugins=(
     'https://github.com/monun/kotlin-plugin/releases/latest/download/Kotlin-1.4.32.jar'
     'https://github.com/monun/auto-update/releases/latest/download/AutoUpdate.jar'
-    'https://ci.dmulloy2.net/job/ProtocolLib/lastSuccessfulBuild/artifact/target/ProtocolLib.jar',
+    'https://ci.dmulloy2.net/job/ProtocolLib/lastSuccessfulBuild/artifact/target/ProtocolLib.jar'
     'https://media.forgecdn.net/files/3237/689/worldedit-bukkit-7.2.4.jar'
 )
 
