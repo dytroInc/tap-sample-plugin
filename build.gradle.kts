@@ -1,4 +1,5 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import de.undercouch.gradle.tasks.download.Download
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.io.OutputStream
 
@@ -43,6 +44,17 @@ dependencies {
     compileOnly("com.comphenix.protocol:ProtocolLib:4.6.0")
 }*/
 
+fun TaskContainer.createPaperJar(name: String, classifier: String = "", configuration: ShadowJar.() -> Unit) {
+    create<ShadowJar>(name) {
+        archiveBaseName.set(project.property("pluginName").toString())
+        archiveVersion.set("") // For bukkit plugin update
+        archiveClassifier.set(classifier)
+        from(sourceSets["main"].output)
+        configurations = listOf(project.configurations.implementation.get().apply { isCanBeResolved = true })
+        configuration()
+    }
+}
+
 tasks {
     withType<KotlinCompile> {
         kotlinOptions.jvmTarget = "11"
@@ -66,37 +78,25 @@ tasks {
         archiveClassifier.set("sources")
     }
 
-    fun ShadowJar.pluginJar(classifier: String = "") {
-        archiveBaseName.set(project.property("pluginName").toString())
-        archiveVersion.set("") // For bukkit plugin update
-        archiveClassifier.set(classifier)
-        from(sourceSets["main"].output)
-        configurations = listOf(project.configurations.implementation.get().apply { isCanBeResolved = true })
-    }
-
-    create<ShadowJar>("pluginJar") {
-        pluginJar()
+    createPaperJar("paperJar") {
         relocate("com.github.monun.kommand", "${rootProject.group}.${rootProject.name}.kommand")
         relocate("com.github.monun.tap", "${rootProject.group}.${rootProject.name}.tap")
     }
 
-    create<ShadowJar>("testPluginJar") {
-        pluginJar("TEST")
+    createPaperJar("debugJar", "DEBUG") {
+        var dest = File(rootDir, ".server/plugins")
+        val pluginName = archiveFileName.get()
+        val pluginFile = File(dest, pluginName)
+        if (pluginFile.exists()) dest = File(dest, "update")
+
+        copy {
+            from(archiveFile)
+            into(dest)
+        }
     }
 
     build {
-        dependsOn(named("pluginJar"))
-    }
-
-    create<Copy>("copyToServer") {
-        val task = named("testPluginJar")
-        from(task)
-        val plugins = File(rootDir, ".server/plugins")
-        if (File(plugins, (task.get() as ShadowJar).archiveFileName.get()).exists()) {
-            into(File(plugins, "update"))
-        } else {
-            into(plugins)
-        }
+        dependsOn(named("paperJar"))
     }
 
     create<DefaultTask>("setupWorkspace") {
@@ -113,7 +113,7 @@ tasks {
                 repos.find { it.name.startsWith(version) }?.also { println("Skip downloading spigot-$version") } == null
             }.also { if (it.isEmpty()) return@doLast }
 
-            val download by registering(de.undercouch.gradle.tasks.download.Download::class) {
+            val download by registering(Download::class) {
                 src("https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar")
                 dest(buildtools)
             }
