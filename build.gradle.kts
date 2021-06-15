@@ -1,15 +1,18 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import de.undercouch.gradle.tasks.download.Download
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.io.OutputStream
+import org.apache.commons.io.output.NullOutputStream
 
 plugins {
-    kotlin("jvm") version "1.4.32"
-
-    kotlin("plugin.serialization") version "1.4.32"
+    kotlin("jvm") version "1.5.10"
+    kotlin("plugin.serialization") version "1.5.10"
     id("com.github.johnrengelman.shadow") version "5.2.0"
     `maven-publish`
-    idea
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(8))
+    }
 }
 
 repositories {
@@ -21,19 +24,17 @@ repositories {
 
 dependencies {
     compileOnly(kotlin("stdlib"))
-    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.3")
+    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.0")
     compileOnly("com.destroystokyo.paper:paper-api:1.16.5-R0.1-SNAPSHOT")
-//    compileOnly("com.github.monun:invfx:2.0.0")
+//    compileOnly("com.github.monun:invfx:2.1.0")
 
-    implementation("com.github.monun:tap:3.6.0")
-    implementation("com.github.monun:kommand:1.0.0")
+    implementation("com.github.monun:tap:3.7.1")
+    implementation("com.github.monun:kommand:1.1.0")
 
-    /*
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.7.0")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.7.0")
     testImplementation("org.mockito:mockito-core:3.6.28")
     testImplementation("org.spigotmc:spigot:1.16.5-R0.1-SNAPSHOT")
-     */
 }
 
 /*//ProtocolLib
@@ -56,10 +57,6 @@ fun TaskContainer.createPaperJar(name: String, classifier: String = "", configur
 }
 
 tasks {
-    withType<KotlinCompile> {
-        kotlinOptions.jvmTarget = "11"
-    }
-
     processResources {
         filesMatching("**/*.yml") {
             expand(project.properties)
@@ -84,14 +81,16 @@ tasks {
     }
 
     createPaperJar("debugJar", "DEBUG") {
-        var dest = File(rootDir, ".server/plugins")
+        var dest = File(rootDir, ".debug/plugins")
         val pluginName = archiveFileName.get()
         val pluginFile = File(dest, pluginName)
         if (pluginFile.exists()) dest = File(dest, "update")
 
-        copy {
-            from(archiveFile)
-            into(dest)
+        doLast {
+            copy {
+                from(archiveFile)
+                into(dest)
+            }
         }
     }
 
@@ -128,8 +127,8 @@ tasks {
                         main = "-jar"
                         args = listOf("./${buildtools.name}", "--rev", v)
                         // Silent
-                        standardOutput = OutputStream.nullOutputStream()
-                        errorOutput = OutputStream.nullOutputStream()
+                        standardOutput = NullOutputStream.NULL_OUTPUT_STREAM
+                        errorOutput = NullOutputStream.NULL_OUTPUT_STREAM
                     }
                 }
             }.onFailure {
