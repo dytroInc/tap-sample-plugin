@@ -1,12 +1,18 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.io.OutputStream
+import de.undercouch.gradle.tasks.download.Download
+import org.apache.commons.io.output.NullOutputStream
 
 plugins {
-    kotlin("jvm") version "1.4.32"
-    kotlin("plugin.serialization") version "1.4.32"
+    kotlin("jvm") version "1.5.10"
+    kotlin("plugin.serialization") version "1.5.10"
     id("com.github.johnrengelman.shadow") version "5.2.0"
     `maven-publish`
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(8))
+    }
 }
 
 repositories {
@@ -18,12 +24,12 @@ repositories {
 
 dependencies {
     compileOnly(kotlin("stdlib"))
-    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.3")
+    compileOnly("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.0")
     compileOnly("com.destroystokyo.paper:paper-api:1.16.5-R0.1-SNAPSHOT")
-//    compileOnly("com.github.monun:invfx:2.0.0")
+//    compileOnly("com.github.monun:invfx:2.1.0")
 
-    implementation("com.github.monun:tap:3.6.0")
-    implementation("com.github.monun:kommand:1.0.0")
+    implementation("com.github.monun:tap:3.7.1")
+    implementation("com.github.monun:kommand:1.1.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.7.0")
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.7.0")
@@ -39,11 +45,18 @@ dependencies {
     compileOnly("com.comphenix.protocol:ProtocolLib:4.6.0")
 }*/
 
-tasks {
-    withType<KotlinCompile> {
-        kotlinOptions.jvmTarget = "11"
+fun TaskContainer.createPaperJar(name: String, classifier: String = "", configuration: ShadowJar.() -> Unit) {
+    create<ShadowJar>(name) {
+        archiveBaseName.set(project.property("pluginName").toString())
+        archiveVersion.set("") // For bukkit plugin update
+        archiveClassifier.set(classifier)
+        from(sourceSets["main"].output)
+        configurations = listOf(project.configurations.implementation.get().apply { isCanBeResolved = true })
+        configuration()
     }
+}
 
+tasks {
     processResources {
         filesMatching("**/*.yml") {
             expand(project.properties)
@@ -62,37 +75,27 @@ tasks {
         archiveClassifier.set("sources")
     }
 
-    fun ShadowJar.pluginJar(classifier: String = "") {
-        archiveBaseName.set(project.property("pluginName").toString())
-        archiveVersion.set("") // For bukkit plugin update
-        archiveClassifier.set(classifier)
-        from(sourceSets["main"].output)
-        configurations = listOf(project.configurations.implementation.get().apply { isCanBeResolved = true })
-    }
-
-    create<ShadowJar>("pluginJar") {
-        pluginJar()
+    createPaperJar("paperJar") {
         relocate("com.github.monun.kommand", "${rootProject.group}.${rootProject.name}.kommand")
         relocate("com.github.monun.tap", "${rootProject.group}.${rootProject.name}.tap")
     }
 
-    create<ShadowJar>("testPluginJar") {
-        pluginJar("TEST")
+    createPaperJar("debugJar", "DEBUG") {
+        var dest = File(rootDir, ".debug/plugins")
+        val pluginName = archiveFileName.get()
+        val pluginFile = File(dest, pluginName)
+        if (pluginFile.exists()) dest = File(dest, "update")
+
+        doLast {
+            copy {
+                from(archiveFile)
+                into(dest)
+            }
+        }
     }
 
     build {
-        dependsOn(named("pluginJar"))
-    }
-
-    create<Copy>("copyToServer") {
-        val task = named("testPluginJar")
-        from(task)
-        val plugins = File(rootDir, ".server/plugins")
-        if (File(plugins, (task.get() as ShadowJar).archiveFileName.get()).exists()) {
-            into(File(plugins, "update"))
-        } else {
-            into(plugins)
-        }
+        dependsOn(named("paperJar"))
     }
 
     create<DefaultTask>("setupWorkspace") {
@@ -109,7 +112,7 @@ tasks {
                 repos.find { it.name.startsWith(version) }?.also { println("Skip downloading spigot-$version") } == null
             }.also { if (it.isEmpty()) return@doLast }
 
-            val download by registering(de.undercouch.gradle.tasks.download.Download::class) {
+            val download by registering(Download::class) {
                 src("https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar")
                 dest(buildtools)
             }
@@ -124,8 +127,8 @@ tasks {
                         main = "-jar"
                         args = listOf("./${buildtools.name}", "--rev", v)
                         // Silent
-                        standardOutput = OutputStream.nullOutputStream()
-                        errorOutput = OutputStream.nullOutputStream()
+                        standardOutput = NullOutputStream.NULL_OUTPUT_STREAM
+                        errorOutput = NullOutputStream.NULL_OUTPUT_STREAM
                     }
                 }
             }.onFailure {
