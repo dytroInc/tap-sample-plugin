@@ -32,7 +32,7 @@ if [ ! -f "$server_config" ]; then
   "debug": true,
   "debug_port": 5005,
   "backup": true,
-  "restart": true,
+  "restart": false,
   "memory": 2,
   "plugins": [
 EOF
